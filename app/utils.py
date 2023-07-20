@@ -8,6 +8,12 @@ load_dotenv()
 openai_api_key = os.getenv("OPENAI_API_KEY","Error")
 
 def get_tags():
+    cnx = mysql.connector.connect(
+    host='your_host',
+    user='your_username',
+    password='your_password',
+    database='your_database'
+    )
     tags_list = ["AI","Technology","Cybersecurity","Home Theater","Cooking"]
     return tags_list
 
