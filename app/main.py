@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from models import Bookmark
-from typing import Dict
+from typing import List
+from utils import add_bookmark
 
 
 bookmarks = []
@@ -13,17 +14,13 @@ async def get_bookmarks():
     return bookmarks
 
 @app.post("/bookmarks/add")
-async def add_bookmark(payload: Dict[str, str]):
-    url = payload.get("URL")
-    body = payload.get("BODY")
-
-    # Perform further processing or validation as needed
-
-    # Example: Creating a new bookmark
-    bookmark = Bookmark(id=len(bookmarks) + 1, title="", url=url)
-    bookmarks.append(bookmark)
-    print(f"URL: {url}")
-    print(f"Body: {body}")
+async def add_bookmark_route(payload: Bookmark):
+    url = str(payload.url)
+    print(f"Received URL: {url}")
+    results = await add_bookmark(url)
+    if "URL Already Exists" in results:
+        return {"message": "URL already exists"}
+    
 
     return {"message": "Bookmark added successfully"}
 

@@ -6,33 +6,35 @@ import requests
 from newspaper import Article,fulltext
 import json
 from datetime import date
-import logging
-from pythonjsonlogger import jsonlogger
+# import logging
+# from pythonjsonlogger import jsonlogger
+import asyncio
+from logstuff import setup_logging
 
-def setup_logging(log_level=logging.INFO, log_file=None):
-    log_file = "request.log"
-    # Create a JSON logger
-    logger = logging.getLogger()
+# def setup_logging(log_level=logging.INFO, log_file=None):
+#     log_file = "request.log"
+#     # Create a JSON logger
+#     logger = logging.getLogger()
 
-    # Clear any existing handlers to avoid duplicate logs
-    logger.handlers.clear()
+#     # Clear any existing handlers to avoid duplicate logs
+#     logger.handlers.clear()
 
-    # Create a console handler with the JSON formatter
-    console_handler = logging.StreamHandler()
-    formatter = jsonlogger.JsonFormatter(fmt='%(asctime)s %(levelname)s %(message)s')
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
+#     # Create a console handler with the JSON formatter
+#     console_handler = logging.StreamHandler()
+#     formatter = jsonlogger.JsonFormatter(fmt='%(asctime)s %(levelname)s %(message)s')
+#     console_handler.setFormatter(formatter)
+#     logger.addHandler(console_handler)
 
-    # Add a file handler if log_file path is provided
-    if log_file:
-        file_handler = logging.FileHandler(log_file)
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
+#     # Add a file handler if log_file path is provided
+#     if log_file:
+#         file_handler = logging.FileHandler(log_file)
+#         file_handler.setFormatter(formatter)
+#         logger.addHandler(file_handler)
 
-    logger.setLevel(log_level)
+#     logger.setLevel(log_level)
 
 
-    return logger
+#     return logger
 
 logger = setup_logging()
 
@@ -53,7 +55,7 @@ cnx = mysql.connector.connect(
     database=db_name
     )
 
-def get_tags():
+async def get_tags():
     cursor = cnx.cursor()
     query = "SELECT * from tags"
     cursor.execute(query)
@@ -63,26 +65,45 @@ def get_tags():
 
     return tags_list
 
-def write_article_to_db(webpage_title,webpage_summary,webpage_text,webpage_markdown,url,tags):
+async def get_url_from_db(url):
+    logger.debug(f"Checking DB for URL: {url}")
+    try:
+        cursor = cnx.cursor()
+        query = f"SELECT * from webpages where url = '{url}'"
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        cursor.close()
+
+        if not rows: #No results found
+            logger.debug(f"URL {url} was not found in the database")
+            return False
+        else:
+            logger.debug(f"Found URL {url} in database")
+            return rows
+    except Exception as e:
+        logger.error(f"Error looking for URL: {url}: {e}")
+
+async def write_article_to_db(webpage_title,webpage_summary,webpage_text,webpage_markdown,url,tags):
     logger.info(f"Writing URL: {url} to database")
     current_date = date.today().isoformat()
     tags_str = ",".join(tags)
     cursor = cnx.cursor()
-    #query = "INSERT INTO webpages (url, title, date_added, summary, raw_text, tags, markdown) VALUES (%s, %s, %s, %s, %s, %s, %s)"
     query = f"INSERT INTO {db_table} (url, title, date_added, summary, raw_text, tags, markdown) VALUES (%s, %s, %s, %s, %s, %s, %s)"
     values = (url, webpage_title, current_date, webpage_summary, webpage_text, tags_str, webpage_markdown)
-    cursor.execute(query, values)
-    cnx.commit()
+    try:
+        cursor.execute(query, values)
+        cnx.commit()
+        return True
+    except Exception as e:
+        logger.error(f"Error: {e} ")
+        return False
     cursor.close()
 
 
 
 
-def get_webpage_text(url):
+async def get_webpage_text(url):
     logger.info(f"Retrieving webpage text for {url}")
-    # Convert this to an Article
-    # html = requests.get(url).text
-    # text = fulltext(html)
     article = Article(url)
     article.download()
     try:
@@ -98,10 +119,8 @@ def get_webpage_text(url):
         
 
 
-def query_gpt_summary(body):
-    tags = get_tags()
-    # with open("examples/log4j.txt","r") as f:
-    #     sample_article = f.read()
+async def query_gpt_summary(body):
+    tags = await get_tags()
 
     response = openai.ChatCompletion.create(
     model="gpt-4",
@@ -129,12 +148,9 @@ The list of tags I want you to consider is {tags}. Your response should be in JS
     api_key=openai_api_key 
     ) 
 
-    #print(response.choices[0].message.content)
     return response.choices[0].message.content
 
-def query_gpt_markdown(body):
-    # with open("examples/log4j.txt","r") as f:
-    #     sample_article = f.read()
+async def query_gpt_markdown(body):
 
     response = openai.ChatCompletion.create(
     model="gpt-4",
@@ -157,28 +173,31 @@ and you will transform it into markdown syntax, then send it back to me."""
 
     return response.choices[0].message.content
 
-def add_bookmark(url):
+async def add_bookmark(url):
     logger.info(f"Received request to download {url}")
-    webpage_title, webpage_text = get_webpage_text(url)
-    webpage_summary_payload = query_gpt_summary(webpage_text)
+    logger.info(f"Checking to see if we already have {url} in our database")
+    already_exists = await get_url_from_db(url)
+    if already_exists:
+        logger.info(f"URL {url} already exists, skipping")
+        return "URL Already Exists"
+    logger.info("{url} not found in database, proceeding to add")
+    webpage_title, webpage_text = await get_webpage_text(url)
+    webpage_summary_payload = await query_gpt_summary(webpage_text)
     webpage_dict = json.loads(webpage_summary_payload)
     tags = webpage_dict['tags']
     webpage_summary = webpage_dict['summary']
-    webpage_markdown = query_gpt_markdown(webpage_text)
-    # (webpage_title,webpage_summary,webpage_text,webpage_markdown,url,tags)
-    write_article_to_db(webpage_title,webpage_summary,webpage_text,webpage_markdown,url,tags)
+    webpage_markdown = await query_gpt_markdown(webpage_text)
+    db_update_reult = await write_article_to_db(webpage_title,webpage_summary,webpage_text,webpage_markdown,url,tags)
 
-    #print(f"Webpage Summary: \n{webpage_summary_payload}")
-    # print(f"Website Summary: \n{webpage_summary}")
-    # print("")
-    # print(f"Tags: {tags}")
-    # print("")
-    # print(f"Markdown:\n{webpage_markdown}")
+    if db_update_reult:
+        logger.info(f"URL {url} successfully added to database")
+        return "URL Added Successfully"
+    else:
+        logger.info(f"Failed to add URL {url} the database")
+        return "Failed to add URL"
+
+  
 
 if __name__ == "__main__":
-    #query_gpt_summary("url","body")
-    #query_gpt_markdown("url","body")
-    #tags_list = get_tags()
-    #print(f"Tags: {tags_list}")
     url = "https://www.linkedin.com/pulse/3-ways-vector-databases-take-your-llm-use-cases-next-level-mishra"
     add_bookmark(url)
