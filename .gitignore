@@ -1,3 +1,4 @@
 .env
 request.log
+app/__pycache__
 app/__pycache__/*

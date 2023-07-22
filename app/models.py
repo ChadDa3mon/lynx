@@ -23,7 +23,6 @@ class Bookmark(BaseModel):
 
         # Remove the specified tracking parameters from the query string
         for param in cls.tracking_params_to_remove:
-            print(f"Removing tracking parameter: {param}")
             logger.debug(f"Removed tracking parameter '{param}'")
             query_params.pop(param, None)
 
@@ -32,5 +31,9 @@ class Bookmark(BaseModel):
 
         # Reassemble the URL with the modified query string
         new_url = parsed_url._replace(query=new_query_string).geturl()
-        logger.debug(f"URL after stripping out tracking: {new_url}")
+        # logger.debug(f"URL after stripping out tracking: {new_url}")
+        if new_url == value:
+            logger.debug(f"No tracking found")
+        else:
+            logger.debug(f"Tracking found, new URL: {new_url}")
         return new_url 
