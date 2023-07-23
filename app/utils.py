@@ -55,6 +55,36 @@ cnx = mysql.connector.connect(
     database=db_name
     )
 
+def search_db(search_term):
+    logger.info(f"Searching for '{search_term}")
+    cursor = cnx.cursor()
+    query = "select url,summary from webpages where match(raw_text) against (%s in natural language mode);"
+    cursor.execute(query, (search_term,))
+    rows = cursor.fetchall()
+    cursor.close()
+    return rows
+
+def get_markdown(url):
+    my_url = url['URL'].tolist()[0]
+    logger.debug(f"Retrieving markdown for {url['URL'].tolist()[0]}")
+    # print(f"DEBUG: URL is type: {type(url)}, and contains {url['URL'].tolist()[0]}")
+    cursor = cnx.cursor()
+    query = "select markdown from webpages where url = %s"
+    cursor.execute(query, (url['URL'].tolist()))
+    row = cursor.fetchone()  # Fetch the single row (tuple) from the result set
+    cursor.close()
+
+    if row is not None:
+        # Extract the value from the tuple (assuming 'markdown' is the first column)
+        markdown_text = row[0]
+        return markdown_text
+    else:
+        logger.error(f"No markdown returned for {url}")
+        # Handle the case when the query returns no results
+        return False
+    
+
+
 async def get_tags():
     cursor = cnx.cursor()
     query = "SELECT * from tags"
